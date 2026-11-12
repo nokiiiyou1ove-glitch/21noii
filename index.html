@@ -15,7 +15,23 @@
 <div class="field"><label>公鸡耗料（kg）</label><input id="feedM" type="number" min="0" step=".01"></div><div class="field"><label>母鸡耗料（kg）</label><input id="feedF" type="number" min="0" step=".01"></div>
 <div class="field"><label>产蛋数（枚）</label><input id="eggs" type="number" min="0"></div><div class="field"><label>破蛋数（个）</label><input id="broken" type="number" min="0" value="0"></div>
 <div class="field full"><label>疫苗接种情况（写入备注）</label><input id="vaccine" placeholder="例如：H5+7辽宁"></div><div class="field full"><label>转群情况（写入备注）</label><textarea id="transfer" rows="2" placeholder="例如：转入公鸡50只，转出母鸡100只"></textarea></div>
-</div><div class="metric" id="calc">填写数据后显示当日存栏、耗料及产蛋率。</div><div class="row" style="margin-top:13px"><button id="save">保存本栋当日数据</button><span id="saved" class="muted"></span></div></section>
+</div>
+<div class="box" style="margin-top:16px;background:#f8fbf9">
+<h3>本栋饲料库存管理</h3>
+<p class="muted">饲料转入、转出和期初库存分别记录；系统按饲料名称自动汇总剩余公斤数和存包数。</p>
+<div class="fields">
+<div class="field"><label>操作类型</label><select id="feedType" style="width:100%;padding:10px;border:1px solid #cfdbd4;border-radius:8px;font-size:15px"><option value="in">饲料转入</option><option value="out">饲料转出</option><option value="opening">登记期初库存</option></select></div>
+<div class="field"><label>操作日期</label><input id="feedDate" type="date"></div>
+<div class="field full"><label>饲料名称 / 型号</label><input id="feedName" placeholder="例如：产蛋高峰料、预产料"></div>
+<div class="field"><label>数量（kg）</label><input id="feedKg" type="number" min="0" step="0.01" placeholder="可填0"></div>
+<div class="field"><label>包数（包）</label><input id="feedBags" type="number" min="0" step="1" placeholder="可填0"></div>
+<div class="field full"><label>备注（可选）</label><input id="feedNote" placeholder="例如：仓库调拨、退料"></div>
+</div>
+<div class="row" style="margin-top:12px"><button id="feedSave">保存饲料记录</button><span id="feedMsg" class="muted"></span></div>
+<div class="metric" id="feedStock">暂无饲料库存记录。</div>
+<h4 style="margin:16px 0 8px">饲料进出历史</h4><div id="feedHistory" class="muted">暂无记录</div>
+</div>
+<div class="metric" id="calc">填写数据后显示当日存栏、耗料及产蛋率。</div><div class="row" style="margin-top:13px"><button id="save">保存本栋当日数据</button><span id="saved" class="muted"></span></div></section>
 <section class="box"><h3>当日录入进度</h3><div id="progress" class="muted">尚未录入</div><div class="row" style="margin-top:14px"><button id="export" disabled>生成当日表格并下载 Excel</button></div><div id="exportMsg" class="status"></div></section></section></main>
 <script>
 let wb,ws,latestStart=1,latestDate,barns=[],active=null,latestRows={};
@@ -27,7 +43,7 @@ $('load').onclick=async()=>{let f=$('file').files[0];if(!f)return alert('请先�
 function records(){try{return JSON.parse(localStorage.getItem(key())||'{}')}catch{return {}}}
 function renderList(){let rec=records();$('barnList').innerHTML='';barns.forEach(b=>{let btn=document.createElement('button');btn.className='barnbtn';btn.innerHTML=`${b.name}<small>${rec[b.name]?'✓ 已保存':'点击进入录入'}</small>`;btn.onclick=()=>openBarn(b.name);$('barnList').appendChild(btn)})}
 function openBarn(name){active=barns.find(b=>b.name===name);$('detail').classList.remove('hidden');$('barnTitle').textContent=active.name+' 鸡舍';let rec=records()[name]||{};$('base').textContent=`批号 ${active.batch}｜品种 ${active.breed}｜上一日日龄 ${active.age}｜上一日公鸡 ${active.male} 只｜母鸡 ${active.female} 只｜上一日产蛋率 ${active.rate.toFixed(2)}%`;
-['addM','subM','addF','subF','deadM','deadF','cullM','cullF','feedM','feedF','eggs','broken','vaccine','transfer'].forEach(id=>$(id).value=rec[id]??(id==='broken'||id.startsWith('add')||id.startsWith('sub')||id.startsWith('dead')||id.startsWith('cull')?'0':''));calc();$('saved').textContent=rec.saved?'本日数据已保存，可再次修改':''}
+['addM','subM','addF','subF','deadM','deadF','cullM','cullF','feedM','feedF','eggs','broken','vaccine','transfer'].forEach(id=>$(id).value=rec[id]??(id==='broken'||id.startsWith('add')||id.startsWith('sub')||id.startsWith('dead')||id.startsWith('cull')?'0':''));calc();$('saved').textContent=rec.saved?'本日数据已保存，可再次修改':'';renderFeed()}
 function getData(){let o={};['addM','subM','addF','subF','deadM','deadF','cullM','cullF','feedM','feedF','eggs','broken','vaccine','transfer'].forEach(id=>o[id]=$(id).value);return o}
 function computed(){let x=getData(),m=active.male+num(x.addM)-num(x.subM)-num(x.deadM)-num(x.cullM),f=active.female+num(x.addF)-num(x.subF)-num(x.deadF)-num(x.cullF),rate=f>0&&x.eggs!==''?num(x.eggs)/f*100:0;return {x,m,f,rate,delta:rate-active.rate}}
 function calc(){if(!active)return;let c=computed();$('calc').innerHTML=`当日公鸡存栏：<b>${c.m}</b> 只　母鸡存栏：<b>${c.f}</b> 只<br>当日产蛋率：<b>${c.rate.toFixed(2)}%</b>　较上一日：<b>${c.delta>=0?'上升':'下降'} ${Math.abs(c.delta).toFixed(2)}</b> 个百分点<br>公鸡耗料：<b>${$('feedM').value||'—'}</b> kg　母鸡耗料：<b>${$('feedF').value||'—'}</b> kg`}
@@ -40,4 +56,15 @@ let serial=(Date.UTC(...day.split('-').map((x,i)=>i===1?Number(x)-1:Number(x)))-
 barns.forEach((b,i)=>{let r=start+4+i,row=ws.getRow(r),d=data[b.name]||{},m=b.male+num(d.addM)-num(d.subM)-num(d.deadM)-num(d.cullM),f=b.female+num(d.addF)-num(d.subF)-num(d.deadF)-num(d.cullF);row.getCell(1).value=b.name;row.getCell(2).value=b.batch;row.getCell(3).value=b.breed;row.getCell(4).value=b.age+1;row.getCell(5).value=m;row.getCell(6).value=f;row.getCell(7).value=num(d.deadM)||null;row.getCell(8).value=num(d.deadF)||null;row.getCell(9).value=num(d.cullM)||null;row.getCell(10).value=num(d.cullF)||null;row.getCell(11).value=d.feedM===''?null:num(d.feedM);row.getCell(12).value=d.feedF===''?null:num(d.feedF);row.getCell(13).value=m&&d.feedM!==''?num(d.feedM)/m*1000:null;row.getCell(14).value=f&&d.feedF!==''?num(d.feedF)/f*1000:null;row.getCell(15).value=d.eggs===''?null:num(d.eggs);row.getCell(16).value=f&&d.eggs!==''?num(d.eggs)/f*100:null;row.getCell(17).value=f&&d.eggs!==''?num(d.eggs)/f*100-b.rate:null;let notes=[];if(num(d.broken))notes.push(`破蛋${num(d.broken)}个`);if(d.vaccine?.trim())notes.push('疫苗：'+d.vaccine.trim());if(d.transfer?.trim())notes.push('转群：'+d.transfer.trim());row.getCell(18).value=notes.join('；')||null;});
 let total=ws.getRow(start+22);total.getCell(1).value='死淘总数';total.getCell(7).value=`=SUM(G${start+4}:H${start+21})`;total.getCell(9).value=`=SUM(I${start+4}:J${start+21})`;
 let buf=await wb.xlsx.writeBuffer(),blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='种鸡生产日报_'+day+'.xlsx';a.click();$('exportMsg').textContent='当日表格已生成并下载。请将下载后的 Excel 作为下一日导入的基础文件。';}catch(e){$('exportMsg').textContent='生成失败：'+e.message}}
+
+// 饲料库存：按鸡舍和饲料名称分别累计，独立于每日生产数据保存。
+const feedKey=()=>`breederFeedStock_${active?active.name:''}`;
+function feedRecords(){try{return JSON.parse(localStorage.getItem(feedKey())||'[]')}catch{return []}}
+function renderFeed(){if(!active)return;const arr=feedRecords(),map={};arr.forEach(x=>{let n=x.name||'未命名饲料';if(!map[n])map[n]={kg:0,bags:0};let sign=x.type==='out'?-1:1;map[n].kg+=sign*(Number(x.kg)||0);map[n].bags+=sign*(Number(x.bags)||0)});
+const names=Object.keys(map);$('feedStock').innerHTML=names.length?names.map(n=>`<div style="padding:7px 0;border-bottom:1px solid #dce8e1"><b>${escapeFeed(n)}</b><br>剩余库存：<b>${map[n].kg.toFixed(2)} kg</b>　存包：<b>${map[n].bags.toFixed(0)} 包</b></div>`).join(''):'暂无饲料库存记录。';
+$('feedHistory').innerHTML=arr.length?arr.slice().reverse().map(x=>`<div style="padding:8px 0;border-bottom:1px solid #e2eae5"><b>${x.type==='in'?'转入':x.type==='out'?'转出':'期初库存'}</b>｜${escapeFeed(x.name)}<br>${escapeFeed(x.date)}：${Number(x.kg||0).toFixed(2)} kg，${Number(x.bags||0)} 包${x.note?'｜'+escapeFeed(x.note):''}</div>`).join(''):'暂无记录';}
+function escapeFeed(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('feedDate').value=new Date().toISOString().slice(0,10);
+$('feedType').addEventListener('change',()=>{$('feedMsg').textContent=$('feedType').value==='opening'?'期初库存会作为该饲料的初始数量计入库存。':''});
+$('feedSave').onclick=()=>{if(!active)return;let name=$('feedName').value.trim(),kg=Number($('feedKg').value)||0,bags=Number($('feedBags').value)||0,type=$('feedType').value,date=$('feedDate').value;if(!name)return alert('请填写饲料名称');if(!date)return alert('请选择操作日期');if(kg<=0&&bags<=0)return alert('公斤数和包数至少填写一项');let arr=feedRecords();if(type==='out'){let current=arr.filter(x=>x.name===name).reduce((a,x)=>{let sign=x.type==='out'?-1:1;return {kg:a.kg+sign*(Number(x.kg)||0),bags:a.bags+sign*(Number(x.bags)||0)}},{kg:0,bags:0});if(kg>current.kg+0.0001||bags>current.bags+0.0001)return alert(`库存不足。当前 ${current.kg.toFixed(2)} kg、${current.bags} 包，不能超出库存转出。`)}arr.push({type,name,kg,bags,date,note:$('feedNote').value.trim(),createdAt:Date.now()});localStorage.setItem(feedKey(),JSON.stringify(arr));$('feedKg').value='';$('feedBags').value='';$('feedNote').value='';$('feedMsg').textContent='饲料记录已保存';renderFeed()};
 </script></body></html>
